@@ -1,0 +1,68 @@
+services:
+  ingestion:
+    container_name: ingestion-service
+    build: ./ingestion-service
+    ports:
+      - "7001:7001"
+    volumes:
+      - ./datalake:/app/datalake
+    networks:
+      - searchnet
+
+  indexing:
+    container_name: indexing-service
+    build: ./indexing-service
+    ports:
+      - "7002:7002"
+    volumes:
+      - ./datalake:/app/datalake
+      - ./datamart:/app/datamart
+    depends_on:
+      - ingestion
+    networks:
+      - searchnet
+
+  search:
+    container_name: search-service
+    build: ./search-service
+    ports:
+      - "7003:7003"
+    volumes:
+      - ./datamart:/app/datamart
+    depends_on:
+      - indexing
+    networks:
+      - searchnet
+
+  control:
+    container_name: control-module
+    build: ./control-module
+    ports:
+      - "7000:7000"
+    depends_on:
+      - ingestion
+      - indexing
+      - search
+    networks:
+      - searchnet
+
+  benchmarks:
+    container_name: benchmarks
+    build: ./benchmarks
+    volumes:
+      - ./results:/app/results
+    depends_on:
+      - control
+      - ingestion
+      - indexing
+      - search
+    environment:
+      INGESTION_URL: http://ingestion-service:7001
+      INDEXING_URL: http://indexing-service:7002
+      SEARCH_URL: http://search-service:7003
+    networks:
+      - searchnet
+
+networks:
+  searchnet:
+    driver: bridge
